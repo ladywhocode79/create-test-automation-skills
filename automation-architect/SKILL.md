@@ -32,29 +32,111 @@ Never skip the preview step. Never write files without explicit confirmation.
 Run all rounds in sequence. Do not skip questions. Do not combine rounds
 into a single wall of text — ask each round, wait for the answer, then proceed.
 
+**CRITICAL:** PRD intake (Round -1) is MANDATORY and must happen first.
+
 ---
 
-### Round 0 — Test Type (Ask this first, alone)
+### Round -1 — PRD Intake (Ask this first, alone — MANDATORY)
 
 ```
 Welcome. I'm your Lead SDET for this session.
 Let's design your automation framework from the ground up.
 
-Q0. What type of testing are you setting up?
+**First: Let's discuss your Product Requirements Document (PRD)**
 
-  [A] API / Functional
-      Validate REST, GraphQL, or gRPC endpoints directly.
-      No browser — pure HTTP request/response validation.
+Do you have a PRD (Product Requirements Document) that describes the system
+you're testing?
 
-  [B] UI / End-to-End
-      Automate browser interactions and validate user-facing behavior.
-      Tools: Playwright or Selenium WebDriver + Page Object Model.
+  [A] Yes, I have a PRD (provide link, text, markdown, or PDF)
+      → Upload or paste your PRD
 
-  [C] Full-Stack  (API + UI in one project)
-      Shared data models, auth, and reporting.
-      Separate test suites for API contracts and UI flows.
-      Both suites run in the same CI pipeline.
+  [B] No, use the sample PRD template
+      → I'll provide a sample PRD (User Management API) with intentional
+        ambiguities that you can customize or replace later
+
+  [C] I'll provide PRD later
+      → We can scaffold the framework now, but PRD is essential for edge-case
+        coverage and confirming the automation type
+
+If you choose [A] or [B]:
+  - I will analyze the PRD to identify:
+    * What endpoints/pages need automation coverage
+    * Ambiguities and edge cases (missing specs, vague requirements)
+    * Likely automation type (API, UI, Full-Stack, Non-Functional)
+    * Authorization, validation, and error-handling patterns
+  - I will confirm with you what type of automation this represents
 ```
+
+Store the PRD content. If user chooses [B], display the sample PRD from
+`references/samples/sample-prd-user-management.md`.
+
+---
+
+### Round 0 — PRD Analysis & Test Type Confirmation
+
+After PRD intake, analyze the PRD using `references/prd-analysis-guide.md`.
+
+**Step 0a: Extract Scope**
+1. Identify all endpoints, pages, workflows
+2. Document use cases (happy path + error paths)
+3. Extract auth, authorization, performance requirements
+
+**Step 0b: Identify Ambiguities**
+Use `references/templates/edge-case-checklist.md` (10 categories):
+  • Input Validation (empty, null, boundaries, special chars)
+  • Business Logic (duplicates, state transitions, permissions)
+  • Data Integrity (constraints, invariants, cascading ops)
+  • Resource Limits & Pagination
+  • Error Handling
+  • Performance & Scalability
+  • Security (auth, injection, data exposure)
+  • Backwards Compatibility
+  • Time-Based
+  • Platform-Specific
+
+Count and prioritize ambiguities: P0 (Critical), P1 (High), P2 (Medium).
+
+**Step 0c: Recommend Type**
+
+Use the decision matrix from `prd-analysis-guide.md`:
+- **API**: REST/GraphQL endpoints, no UI, data validation focus
+- **UI**: User workflows, browser interaction, page flows
+- **Full-Stack**: Both API + UI in same project
+- **Non-Functional**: Performance, load, security, chaos testing
+
+**Then ask:**
+
+```
+Based on your PRD analysis:
+
+SCOPE IDENTIFIED:
+  Endpoints/Pages: [List 2-3 key items from PRD]
+  Use Cases: [2-3 key flows]
+
+AMBIGUITIES DETECTED: [N] gaps found
+  P0 (Critical): [List 1-2]
+  P1 (High): [List 1-2]
+  P2 (Medium): [List 1-2]
+  (See full list in edge-case checklist)
+
+RECOMMENDED AUTOMATION TYPE:
+  [A] API / Functional
+  [B] UI / End-to-End
+  [C] Full-Stack (API + UI)
+  [D] Non-Functional (Performance, Load, Security)
+
+I recommend [TYPE] because:
+  • [Reason 1 from PRD]
+  • [Reason 2 from PRD]
+
+Does this match your testing goals? [A/B/C/D/Other]
+```
+
+**Wait for confirmation.** If user disagrees, ask why and re-assess.
+
+**Note:** Regardless of selected type, the generated scaffold will include
+edge-case test templates highlighting the identified ambiguities. These
+tests will help clarify the PRD.
 
 ---
 
@@ -212,11 +294,47 @@ Do NOT write any files until the user responds to the confirmation prompt.
 
 ### Step 4 — Write Files (only on Y or P)
 
-Write every file using the Write tool. After writing:
-1. Confirm the count of files written
+Write every file using the Write tool. Always include `README.md` as the
+first file written. The README must be generated from the resolved config
+and must cover:
+- Tech stack table
+- Project structure (4-layer architecture)
+- Setup instructions
+- Running tests (mock + real)
+- Switching environments
+- Test groups (including **edge-case test group**)
+- Adding a new resource
+- PRD ambiguities link
+- Edge-case test priority levels (P0/P1/P2)
+- CI/CD secrets
+- Phase 2 NFR gate conditions
+
+**EDGE-CASE INTEGRATION:**
+
+In addition to standard scaffold files, generate:
+1. **EDGE_CASES.md** — PRD ambiguities and corresponding test cases
+   - List all identified ambiguities (from Round 0 PRD analysis)
+   - Map each ambiguity → edge-case test
+   - Prioritize: P0 (Critical), P1 (High), P2 (Medium)
+   - Example: "Email validation ambiguous; test plus addressing, localhost"
+
+2. **Edge-case test templates** (language-specific)
+   - Python: parametrized pytest fixtures with data-driven test cases
+   - Java: @DataProvider methods with @Test annotations
+   - Each template targets one ambiguity category
+
+3. **PRD_CLARIFICATION_CHECKLIST.md**
+   - List all P0 ambiguities (must clarify before dev)
+   - Acceptance criteria: tests should be passing once clarified
+   - Action: Use test failures to drive PRD updates
+
+After writing all files:
+1. Confirm the count of files written (including README.md)
 2. Print the `NEXT_STEPS.md` content inline (do not write it as a file):
    - How to run the test suite locally
+   - How to run only edge-case tests: `pytest -m edge_case`
    - How to start WireMock locally (if mock selected)
+   - **How to use edge-case tests to clarify PRD**
    - How to add a new language track
    - Phase 2 NFR gate conditions (load from `references/nfr-roadmap.md`)
 
