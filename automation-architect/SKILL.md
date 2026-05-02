@@ -220,6 +220,13 @@ Q7. Service Mode:
   Note: WireMock works for both API tests (direct HTTP mocking) and UI tests
   (mocking the backend your application calls).
 
+  OpenAPI / Swagger spec signal: If the user mentions they have an OpenAPI or
+  Swagger spec file, surface this trade-off before confirming:
+  "WireMock stubs are hand-authored JSON — there is no built-in spec import.
+   If you want stubs auto-generated from your OpenAPI spec, Prism is a better
+   fit. Want to switch to Prism, or keep WireMock and author stubs manually?"
+  Load references/mock-options.md for the Prism comparison if user asks.
+
 Q8. Test Reporting:
   [A] Allure          (rich HTML, trends, attachments — recommended)
   [B] ReportPortal    (centralised dashboard, AI defect triage)
@@ -381,3 +388,276 @@ New tracks can be added by creating
 `~/.claude/skills/automation-architect-{language}/SKILL.md`
 following the Track Contract. The orchestrator will discover and present
 it automatically at next invocation.
+
+---
+
+## Phase 4: Execution & Verification
+
+This phase runs **automatically after Phase 3 Step 4** (all files written).
+The default action is **[R] Run tests now** — present it pre-selected.
+
+---
+
+### Step 1 — Offer Execution (print immediately after file write)
+
+```
+══════════════════════════════════════════════════════════════════
+  PHASE 4 — EXECUTION & VERIFICATION
+══════════════════════════════════════════════════════════════════
+
+  Scaffold written. Let's verify it works end-to-end.
+
+  [R] Run tests now  ← DEFAULT
+      I'll check dependencies, start WireMock if needed,
+      run both happy-path AND edge-case tests, then
+      generate your first report.
+
+  [S] Show me the commands
+      Print all run/report commands — you run them manually.
+
+  [X] Skip
+      Session ends here. Refer to README.md.
+
+  Your choice (press Enter to accept default R):
+══════════════════════════════════════════════════════════════════
+```
+
+If user presses Enter or types nothing → treat as [R].
+
+---
+
+### Step 2 — Dependency Pre-flight
+
+Before running any tests, verify all required dependencies exist.
+
+**Python:**
+```
+Check:  pip show pytest pydantic requests playwright
+If any missing → present:
+  "Missing: {package list}
+   Fix: pip install -r requirements.txt
+   [A] Run it now   [B] I'll run it — let me know when done"
+```
+
+**Java:**
+```
+Check:  mvn dependency:resolve -q
+If fails → show Maven error, identify the missing artifact,
+           ask user to check pom.xml or local Maven settings.
+```
+
+**UI — Python/Playwright browsers:**
+```
+Check:  python -c "from playwright.sync_api import sync_playwright"
+        playwright install --list  (verify chromium/firefox are present)
+If missing → present:
+  "Playwright browsers not installed.
+   Fix: playwright install chromium --with-deps
+   [A] Run it now   [B] I'll run it — let me know when done"
+```
+
+**UI — Java/Selenium:**
+No pre-flight needed. WebDriverManager downloads drivers automatically.
+
+---
+
+### Step 3 — WireMock Health Check (only if mock_mode = B or C)
+
+```
+Run: curl -s http://localhost:{WIREMOCK_PORT}/__admin/health
+
+If UP:
+  "WireMock is running ✓"
+  Continue to Step 4.
+
+If DOWN:
+  "WireMock is not running. Tests that call stub endpoints will fail.
+
+   Fix options:
+   [A] Start WireMock now (docker-compose up -d wiremock)
+   [B] I'll start it — let me know when it's up
+   [C] Skip mock tests, run real-service tests only (if applicable)
+
+   Note: If Docker is not installed, go to https://docs.docker.com/get-docker/"
+
+If [A] selected:
+  Run: docker-compose up -d wiremock
+  Re-check health every 10s, up to 3 attempts.
+  If still down after 3 checks → show Docker logs, ask user to investigate.
+```
+
+---
+
+### Step 4 — Run Tests (happy-path + edge-case)
+
+Run both suites together. Do not split them.
+
+**Python:**
+```bash
+pytest layer_4_tests/ -v --tb=short -m "api or ui or edge_case" \
+  --alluredir=allure-results/        # (if reporting = Allure)
+  --html=reports/report.html         # (if reporting = HTML)
+```
+
+**Java:**
+```bash
+mvn test -Dgroups="api,ui,edge-cases"
+```
+
+After the run completes, print the results summary:
+
+```
+══════════════════════════════════════════════════════
+  TEST RESULTS
+══════════════════════════════════════════════════════
+  Total:    N tests
+  Passed:   N  ✓
+  Failed:   N  ✗  (breakdown below)
+  Skipped:  N
+
+  Happy-Path Tests:  N passed / N total
+  Edge-Case Tests:   N passed / N total
+                     (failures here are EXPECTED —
+                      they expose PRD ambiguities)
+══════════════════════════════════════════════════════
+```
+
+**Edge-case failures** — present separately, not as errors:
+```
+EXPECTED FAILURE (PRD ambiguity exposed):
+  test_email_validation[user@localhost]
+  → Ambiguity: PRD does not define whether localhost addresses are valid.
+  → Action: Clarify in PRD → update test expectation.
+  → Reference: EDGE_CASES.md → Section "Email Validation" → P1
+```
+
+**Happy-path failures** — escalate to Step 5.
+
+---
+
+### Step 5 — Failure Diagnosis & Fix Loop (happy-path failures only)
+
+For each happy-path failure, apply this diagnosis loop:
+
+**1. Present the failure with context:**
+```
+FAILURE: {test name}
+  Error:      {raw error message}
+  Root cause: {plain English explanation}
+  Fix:        {specific action}
+
+  [A] {primary fix — I'll help apply it}
+  [B] {secondary fix}
+  [C] Skip this test for now (mark xfail)
+  [D] Mark all remaining failures as xfail and continue to report
+```
+
+**2. Root cause lookup table (apply automatically):**
+
+| Error Pattern | Root Cause | Fix |
+|---|---|---|
+| `ConnectionRefusedError` / `Connection refused` | Service not running or wrong `BASE_URL` | Update `BASE_URL` in `.env` or start the service |
+| `401 Unauthorized` on token request | Wrong `CLIENT_ID` / `CLIENT_SECRET` | Update credentials in `.env` |
+| `FileNotFoundError: .env` | `.env` was never created | `cp .env.example .env` then fill in values |
+| `ModuleNotFoundError` | `pip install` incomplete | `pip install -r requirements.txt` |
+| `playwright._impl._errors.Error: Executable doesn't exist` | Browser binaries missing | `playwright install chromium --with-deps` |
+| `java.lang.ClassNotFoundException` | Maven compile failed | `mvn compile` — show compiler error |
+| `WireMock 404` on stubbed endpoint | Stub not registered | Call `wiremock_lifecycle.register_all_stubs()` |
+| `docker: command not found` | Docker not installed | Install Docker Desktop |
+| `SSLError` / cert error | HTTPS with self-signed cert | Set `VERIFY_SSL=false` in `.env` (non-prod only) |
+
+**3. After any fix is applied, re-run only the affected test:**
+```bash
+# Python
+pytest {test_file}::{TestClass}::{test_method} -v
+
+# Java
+mvn test -Dtest="{TestClass}#{testMethod}"
+```
+
+**4. Repeat until all happy-path tests pass, or user marks remaining as xfail.**
+**5. Never block report generation on edge-case failures** — they are expected.
+
+---
+
+### Step 6 — Report Generation
+
+Generate the report immediately after test run finishes.
+
+**Allure:**
+```bash
+allure generate allure-results/ --clean -o allure-report/
+allure open allure-report/
+```
+Print:
+```
+  Allure report generated → allure-report/index.html
+  Open with: allure open allure-report/
+
+  Report shows:
+  ✓ Happy-path tests: N passed
+  ~ Edge-case tests:  N failing (expected — PRD gaps, see EDGE_CASES.md)
+  Trend baseline set — future CI runs will show history vs this baseline.
+```
+
+**pytest-html / ExtentReports:**
+```
+  HTML report generated → reports/report.html
+  Open in any browser.
+```
+
+**JUnit XML (CI-native):**
+```
+  JUnit XML written → test-results/TEST-*.xml
+  Import into Jenkins/GitHub Actions test reporter.
+  For local viewing: pip install junit2html && junit2html test-results/*.xml
+```
+
+**ReportPortal:**
+```
+  Launch created → {RP_URL}/ui/#default_personal/launches
+  First launch recorded. Future runs will appear in the same project.
+```
+
+**None selected:**
+```
+  No reporter configured. To add one:
+  Re-run /automation-architect → [E] Edit config → Q8 Reporting.
+```
+
+---
+
+### Step 7 — Session Close
+
+Print the final session summary after report is ready:
+
+```
+══════════════════════════════════════════════════════════════════
+  SESSION COMPLETE
+══════════════════════════════════════════════════════════════════
+
+  Framework:            {language} / {test_type}
+  Files written:        N
+  Tests run:            N total
+  Happy-path passed:    N / N  ✓
+  Edge-case (expected): N failing — see EDGE_CASES.md
+  Report:               {path or URL}
+
+  YOUR NEXT ACTIONS
+  ─────────────────
+  1. Review EDGE_CASES.md
+     Clarify P0 ambiguities with your product team.
+     Update PRD → update test expectations → re-run.
+
+  2. Add your real service credentials to .env
+     Replace placeholder values from .env.example.
+
+  3. Push to your CI pipeline
+     First green CI run starts your NFR gate clock.
+
+  4. When CI is green for 5+ consecutive runs:
+     Run /automation-architect-nfr to add load, security,
+     and chaos testing on top of this baseline.
+
+══════════════════════════════════════════════════════════════════
+```
