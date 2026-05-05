@@ -32,7 +32,7 @@ Savings: ~60% fewer output tokens per test run.
 ### Strategy 2 — Pre-scripted Answer Configs
 
 Skip the 9-question interview by pasting a config block directly.
-Config files are in `test-configs/`. Copy the block and paste as your first message.
+Config files are in `tests/test-configs/`. Copy the block and paste as your first message.
 
 | File | What it tests |
 |---|---|
@@ -40,6 +40,9 @@ Config files are in `test-configs/`. Copy the block and paste as your first mess
 | `test-configs/run-b-python-ui.md` | Python + UI + Playwright + WireMock |
 | `test-configs/run-c-java-fullstack.md` | Java + Full-Stack + No mock + GitLab CI |
 | `test-configs/run-d-java-api.md` | Java + API + WireMock + Bearer auth |
+| `test-configs/run-e-python-api-no-mock.md` | Python + API + No mock (TC-MOCK-01-04) |
+| `test-configs/run-f-python-ui-multi-browser.md` | Python + UI + Chrome+Firefox (TC-PY-03-05) |
+| `test-configs/run-g-nfr-gate-check.md` | NFR gate pass/fail scenarios (TC-NFR-01-*) |
 
 Combine with `--test`:
 ```

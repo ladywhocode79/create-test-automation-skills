@@ -55,6 +55,16 @@ The skill will:
 3. Wait for your confirmation `[Y / P / E / N]`
 4. Write all files to your project directory
 
+## Testing
+
+```
+tests/TEST-DESIGN.md    ← Test strategy, 106 test cases across all 5 skills
+tests/TESTING.md        ← Execution guide (4 levels, token optimisation)
+tests/test-configs/     ← Pre-scripted configs (run-a through run-g)
+```
+
+See [`tests/TEST-DESIGN.md`](tests/TEST-DESIGN.md) for the full test plan.
+
 ## Syncing Changes
 
 This repo is a mirror of `~/.claude/skills/automation-architect*`.
